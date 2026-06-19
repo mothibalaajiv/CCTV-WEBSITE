@@ -23,7 +23,6 @@ export default function CreateSite() {
   });
 
   const [formData, setFormData] = useState({
-    site_id: "",
     site_name: "",
     local_server_id: "",
     assigned_user: ""
@@ -52,16 +51,6 @@ export default function CreateSite() {
     <div className="max-w-md mx-auto space-y-6">
       <h1 className="text-2xl font-bold">Create New Site</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Site ID</label>
-          <input
-            required
-            className="w-full p-2 border rounded"
-            value={formData.site_id}
-            onChange={(e) => setFormData({ ...formData, site_id: e.target.value })}
-            placeholder="e.g. SITE1"
-          />
-        </div>
         <div>
           <label className="block text-sm font-medium mb-1">Site Name</label>
           <input

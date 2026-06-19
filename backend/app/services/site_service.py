@@ -14,13 +14,20 @@ class SiteService:
 
     @classmethod
     def create_site(cls, data):
-        if SiteRepository.find_by_site_id(data['site_id']):
-            raise APIError("Site ID already exists", 400)
+        # Auto-generate 3-digit site_id in the 1 series (101, 102, ...)
+        existing_sites = SiteRepository.find_all()
+        max_id = 100
+        for s in existing_sites:
+            sid = s.get('site_id')
+            if sid and sid.isdigit() and len(sid) == 3 and sid.startswith('1'):
+                max_id = max(max_id, int(sid))
+        
+        new_site_id = str(max_id + 1)
             
         cls.check_server_mapping(data.get('local_server_id'))
             
         site_data = {
-            "site_id": data['site_id'],
+            "site_id": new_site_id,
             "site_name": data['site_name'],
             "local_server_id": data.get('local_server_id'),
             "status": data.get('status', 'active')
@@ -35,8 +42,8 @@ class SiteService:
             user = UserService.get_user(assigned_user)
             if user:
                 sites = user.get('assigned_sites', [])
-                if data['site_id'] not in sites:
-                    sites.append(data['site_id'])
+                if new_site_id not in sites:
+                    sites.append(new_site_id)
                     UserService.update_user(assigned_user, {"assigned_sites": sites})
         
         return site

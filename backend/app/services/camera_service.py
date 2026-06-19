@@ -91,6 +91,18 @@ class CameraService:
         return camera
 
     @classmethod
+    def update_camera_location_by_code(cls, camera_code, location_name):
+        camera = CameraRepository.find_by_code(camera_code)
+        if not camera:
+            raise APIError("Camera not found", 404)
+        
+        updated = CameraRepository.update(camera['_id'], {"location_name": location_name})
+        if updated:
+            updated['_id'] = str(updated['_id'])
+            return updated
+        return camera
+
+    @classmethod
     def set_camera_status(cls, camera_id, is_active):
         updated = CameraRepository.update(camera_id, {"is_active": is_active})
         if updated:

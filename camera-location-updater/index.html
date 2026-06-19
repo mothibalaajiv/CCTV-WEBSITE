@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Camera Footage Rename</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>Camera Footage Rename</h1>
+      </header>
+      
+      <main>
+        <div class="form-container">
+          <div class="form-group">
+            <label for="cameraId">Camera ID</label>
+            <input type="text" id="cameraId" class="location-input" placeholder="Enter Camera ID (e.g. 100001)">
+          </div>
+          <div class="form-group">
+            <label for="locationName">Location Name</label>
+            <input type="text" id="locationName" class="location-input" placeholder="Enter new location name">
+          </div>
+          <button id="saveBtn" class="btn-save">Save</button>
+          <div id="statusMessage" class="status-message"></div>
+        </div>
+      </main>
+    </div>
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>

@@ -41,4 +41,7 @@ def create_app(config_class=Config):
     app.register_blueprint(system_bp, url_prefix='/api/system')
     app.register_blueprint(server_bp, url_prefix='/api/servers')
     
+    from .api.public_routes import public_bp
+    app.register_blueprint(public_bp, url_prefix='/api/public')
+    
     return app
