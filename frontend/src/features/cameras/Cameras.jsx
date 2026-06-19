@@ -16,6 +16,11 @@ export default function Cameras() {
     queryFn: () => api.get("/sites").then((res) => res.data),
   });
 
+  const { data: streams } = useQuery({
+    queryKey: ["streams"],
+    queryFn: () => api.get("/streams").then((res) => res.data),
+  });
+
   const updateSiteMutation = useMutation({
     mutationFn: ({ id, siteId }) => api.put(`/cameras/${id}`, { current_site: siteId }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["cameras"] })
@@ -28,7 +33,7 @@ export default function Cameras() {
 
   const toggleStatusMutation = useMutation({
     mutationFn: ({ id, is_active }) => api.put(`/cameras/${id}/status`, { is_active }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["cameras"] })
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["cameras", "streams"] })
   });
 
   return (
@@ -56,14 +61,17 @@ export default function Cameras() {
             {isLoading ? (
               <TableRow><TableCell colSpan={6} className="text-center">Loading...</TableCell></TableRow>
             ) : cameras?.length ? (
-              cameras.map((camera) => (
+              cameras.map((camera) => {
+                const isOnline = streams?.some(s => s.camera_code === camera.camera_code);
+                const streamStatus = isOnline ? 'online' : 'offline';
+                return (
                 <TableRow key={camera._id}>
                   <TableCell className="font-medium">{camera.camera_code}</TableCell>
                   <TableCell>{camera.mac_address}</TableCell>
                   <TableCell>{camera.location_name}</TableCell>
                   <TableCell>
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${camera.stream_status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                      {camera.stream_status}
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${streamStatus === 'online' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                      {streamStatus}
                     </span>
                   </TableCell>
                   <TableCell>
@@ -78,7 +86,8 @@ export default function Cameras() {
                     <Button variant="destructive" size="sm" onClick={() => deleteMutation.mutate(camera._id)}>Delete</Button>
                   </TableCell>
                 </TableRow>
-              ))
+                );
+              })
             ) : (
               <TableRow><TableCell colSpan={6} className="text-center">No cameras found.</TableCell></TableRow>
             )}

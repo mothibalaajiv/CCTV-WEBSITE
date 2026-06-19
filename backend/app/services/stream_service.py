@@ -2,6 +2,10 @@ from app.repositories.stream_repo import StreamRepository
 from app.exceptions import APIError
 from datetime import datetime, timezone
 
+import urllib.request
+import json
+import os
+
 class StreamService:
     @classmethod
     def register_stream(cls, data):
@@ -45,26 +49,59 @@ class StreamService:
 
     @classmethod
     def get_all_streams(cls):
-        streams = StreamRepository.find_all()
+        cloud_url = os.getenv("CLOUD_SERVER_URL", "http://104.251.214.177:8000/api/streams")
+        try:
+            req = urllib.request.Request(cloud_url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=5) as response:
+                cloud_data = json.loads(response.read().decode()).get('streams', [])
+        except Exception as e:
+            print(f"Error fetching streams: {e}")
+            cloud_data = []
+
         from app.repositories.camera_repo import CameraRepository
         from app.repositories.server_repo import LocalServerRepository
+        from app.repositories.stream_repo import StreamRepository
         
         valid_streams = []
-        for s in streams:
+        for s in cloud_data:
+            camera_mac = s.get('camera_mac')
+            server_mac = s.get('local_server_mac')
+            
+            if not camera_mac or not server_mac:
+                continue
+                
             # 1. Check if camera is registered
-            camera = CameraRepository.find_by_camera_code(s.get('camera_code'))
-            if not camera or not camera.get('mac_address'):
+            camera = CameraRepository.find_one({"mac_address": camera_mac})
+            if not camera or not camera.get('is_active'):
                 continue
                 
             # 2. Check if local server MAC is registered
-            server_mac = s.get('local_server_mac')
-            if not server_mac:
-                continue
             server = LocalServerRepository.find_one({"mac_address": server_mac})
-            if not server:
+            if not server or not server.get('is_active'):
                 continue
                 
-            s['_id'] = str(s['_id'])
-            valid_streams.append(s)
+            camera_code = camera.get('camera_code')
+            existing_stream = StreamRepository.find_by_camera_code(camera_code)
+            
+            stream_data = {
+                "camera_code": camera_code,
+                "stream_name": camera.get('location_name', camera_code),
+                "hls_url": s.get('hls_url'),
+                "local_server_mac": server_mac,
+                "camera_mac": camera_mac,
+                "camera_ip": s.get('camera_ip'),
+                "last_seen": datetime.now(timezone.utc)
+            }
+            
+            if existing_stream:
+                stream_data["status"] = existing_stream.get("status", "active")
+                updated = StreamRepository.update(existing_stream['_id'], stream_data)
+                updated['_id'] = str(updated['_id'])
+                valid_streams.append(updated)
+            else:
+                stream_data["status"] = "active"
+                new_stream = StreamRepository.create(stream_data)
+                new_stream['_id'] = str(new_stream['_id'])
+                valid_streams.append(new_stream)
             
         return valid_streams
