@@ -4,6 +4,9 @@ const getApiBaseUrl = () => {
   let url = import.meta.env.VITE_API_URL;
   if (url) {
     url = url.trim().replace(/\/+$/, "");
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      url = `https://${url}`;
+    }
     if (!url.endsWith("/api/public")) {
       if (url.endsWith("/api")) {
         url += "/public";
@@ -13,6 +16,12 @@ const getApiBaseUrl = () => {
     }
     return url;
   }
+
+  // Automatic detection when hosted on Render
+  if (typeof window !== "undefined" && window.location.hostname.includes("onrender.com")) {
+    return "https://cctv-vms-backend.onrender.com/api/public";
+  }
+
   return `http://${window.location.hostname}:5000/api/public`;
 };
 

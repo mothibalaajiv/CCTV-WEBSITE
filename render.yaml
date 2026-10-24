@@ -45,10 +45,7 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: cctv-vms-backend
-          property: host
+        value: https://cctv-vms-backend.onrender.com/api
 
   # -------------------------------------------------------------
   # 3. Camera Location Updater (Lightweight Web Client)
@@ -65,7 +62,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: cctv-vms-backend
-          property: host
+        value: https://cctv-vms-backend.onrender.com/api/public
