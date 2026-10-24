@@ -27,14 +27,15 @@ def dashboard_stats():
 @system_bp.route('/cloud-status', methods=['GET'])
 def get_cloud_status():
     import os
-    import requests
-    cloud_url = os.environ.get('CLOUD_SERVER_URL', 'http://104.251.214.177:8000/api/streams')
+    import urllib.request
+    cloud_url = os.environ.get('CLOUD_SERVER_URL', 'http://104.251.214.177:8000/api/diagnostics')
     base_url = cloud_url.split('/api')[0]
     
     try:
-        response = requests.get(f"{base_url}/api/diagnostics", timeout=3)
-        if response.status_code == 200:
-            return jsonify({"status": "success", "data": {"online": True}})
+        req = urllib.request.Request(f"{base_url}/api/diagnostics", headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=3.0) as response:
+            if response.status == 200:
+                return jsonify({"status": "success", "data": {"online": True}})
     except Exception:
         pass
         

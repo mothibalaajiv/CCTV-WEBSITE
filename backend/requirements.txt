@@ -10,4 +10,4 @@ flasgger==0.9.7.1
 gunicorn==22.0.0
 dnspython==2.6.1
 certifi>=2024.2.2
-
+requests==2.32.3
