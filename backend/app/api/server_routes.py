@@ -17,17 +17,7 @@ def register_server():
     return jsonify({"status": "success", "data": server}), 201
 
 from datetime import datetime, timezone, timedelta
-
-def _parse_diag_timestamp(ts_str):
-    if not ts_str:
-        return datetime.min.replace(tzinfo=timezone.utc)
-    try:
-        dt = datetime.fromisoformat(str(ts_str).replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
-    except Exception:
-        return datetime.min.replace(tzinfo=timezone.utc)
+from app.utils.telemetry import parse_timestamp, is_telemetry_fresh, fetch_cloud_diagnostics, camera_matches
 
 def _find_matching_diagnostic(server, cloud_data, now_utc, all_servers_count=1):
     if not cloud_data:
@@ -36,15 +26,18 @@ def _find_matching_diagnostic(server, cloud_data, now_utc, all_servers_count=1):
     s_mac = (server.get('mac_address') or '').lower().strip()
     s_host = (server.get('hostname') or '').lower().strip()
 
-    # Sort newest first
-    sorted_diag = sorted(cloud_data, key=lambda d: _parse_diag_timestamp(d.get('timestamp')), reverse=True)
+    all_ts = [parse_timestamp(d.get('timestamp')) for d in cloud_data]
+    max_cloud_ts = max(all_ts) if all_ts else None
 
-    # 1. First priority: Fresh (< 3 minutes) report matching MAC, hostname, or single server setup
+    # Sort newest first
+    sorted_diag = sorted(cloud_data, key=lambda d: parse_timestamp(d.get('timestamp')), reverse=True)
+
+    # 1. First priority: Fresh report matching MAC, hostname, or single server setup
     for d in sorted_diag:
         d_mac = (d.get('local_server_mac') or '').lower().strip()
         d_host = (d.get('hostname') or '').lower().strip()
-        d_time = _parse_diag_timestamp(d.get('timestamp'))
-        is_recent = (now_utc - d_time) < timedelta(minutes=3)
+        d_time = parse_timestamp(d.get('timestamp'))
+        is_recent = is_telemetry_fresh(d_time, now_utc, max_cloud_ts, window_seconds=300)
 
         if is_recent:
             if (s_mac and d_mac == s_mac) or (s_host and d_host == s_host) or all_servers_count == 1:
@@ -55,15 +48,15 @@ def _find_matching_diagnostic(server, cloud_data, now_utc, all_servers_count=1):
         d_mac = (d.get('local_server_mac') or '').lower().strip()
         d_host = (d.get('hostname') or '').lower().strip()
         if (s_mac and d_mac == s_mac) or (s_host and d_host == s_host):
-            d_time = _parse_diag_timestamp(d.get('timestamp'))
-            is_recent = (now_utc - d_time) < timedelta(minutes=3)
+            d_time = parse_timestamp(d.get('timestamp'))
+            is_recent = is_telemetry_fresh(d_time, now_utc, max_cloud_ts, window_seconds=300)
             return d, is_recent
 
     # 3. Third priority: Single server fallback to latest available entry
     if all_servers_count == 1 and len(sorted_diag) > 0:
         d = sorted_diag[0]
-        d_time = _parse_diag_timestamp(d.get('timestamp'))
-        is_recent = (now_utc - d_time) < timedelta(minutes=3)
+        d_time = parse_timestamp(d.get('timestamp'))
+        is_recent = is_telemetry_fresh(d_time, now_utc, max_cloud_ts, window_seconds=300)
         return d, is_recent
 
     return None, False
@@ -72,16 +65,7 @@ def _find_matching_diagnostic(server, cloud_data, now_utc, all_servers_count=1):
 @jwt_required()
 def get_servers():
     servers = LocalServerService.get_all_servers()
-    
-    cloud_url = os.getenv("CLOUD_SERVER_URL", "http://104.251.214.177:8000/api/diagnostics")
-    if cloud_url.endswith("/api/streams"):
-        cloud_url = cloud_url.replace("/api/streams", "/api/diagnostics")
-    try:
-        req = urllib.request.Request(cloud_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=3.0) as response:
-            cloud_data = json.loads(response.read().decode()).get('data', [])
-    except Exception:
-        cloud_data = []
+    cloud_data = fetch_cloud_diagnostics()
 
     now_utc = datetime.now(timezone.utc)
     for s in servers:
@@ -106,15 +90,7 @@ def get_servers():
 @server_bp.route('/diagnostics', methods=['GET'])
 @jwt_required()
 def get_server_diagnostics():
-    cloud_url = os.getenv("CLOUD_SERVER_URL", "http://104.251.214.177:8000/api/diagnostics")
-    if cloud_url.endswith("/api/streams"):
-        cloud_url = cloud_url.replace("/api/streams", "/api/diagnostics")
-    try:
-        req = urllib.request.Request(cloud_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=3.0) as response:
-            cloud_data = json.loads(response.read().decode()).get('data', [])
-    except Exception:
-        cloud_data = []
+    cloud_data = fetch_cloud_diagnostics()
 
     try:
         servers = LocalServerRepository.find_all()

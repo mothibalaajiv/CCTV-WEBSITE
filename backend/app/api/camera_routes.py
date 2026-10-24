@@ -23,46 +23,31 @@ def register_camera():
 def get_cameras():
     cameras = CameraService.get_all_cameras()
     
-    import os, urllib.request, json
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timezone
+    from app.utils.telemetry import parse_timestamp, is_telemetry_fresh, fetch_cloud_diagnostics, camera_matches
     
-    cloud_url = os.getenv("CLOUD_SERVER_URL", "http://104.251.214.177:8000/api/diagnostics")
-    if cloud_url.endswith("/api/streams"):
-        cloud_url = cloud_url.replace("/api/streams", "/api/diagnostics")
-    try:
-        req = urllib.request.Request(cloud_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=1.5) as response:
-            cloud_data = json.loads(response.read().decode()).get('data', [])
-    except Exception:
-        cloud_data = []
+    cloud_data = fetch_cloud_diagnostics()
+    now_utc = datetime.now(timezone.utc)
+    all_ts = [parse_timestamp(d.get('timestamp')) for d in cloud_data]
+    max_cloud_ts = max(all_ts) if all_ts else None
 
     for c in cameras:
-        # A camera belongs to a local server based on its mac, but since cameras don't map perfectly in this endpoint,
-        # we check if any telemetry reports this camera as active recently.
-        c_mac = c.get('mac_address', '')
-        
         is_online = False
         for diag in cloud_data:
-            last_checked_str = diag.get('timestamp')
-            is_recent = False
-            if last_checked_str:
-                try:
-                    last_checked_dt = datetime.fromisoformat(last_checked_str.replace("Z", "+00:00"))
-                    if last_checked_dt.tzinfo is None:
-                        last_checked_dt = last_checked_dt.replace(tzinfo=timezone.utc)
-                    if datetime.now(timezone.utc) - last_checked_dt < timedelta(minutes=1):
-                        is_recent = True
-                except Exception:
-                    pass
+            d_time = parse_timestamp(diag.get('timestamp'))
+            is_recent = is_telemetry_fresh(d_time, now_utc, max_cloud_ts, window_seconds=300)
             
             if is_recent and diag.get('cameras'):
                 for cam in diag['cameras']:
-                    if cam.get('camera_mac', '').lower() == c_mac.lower():
-                        is_online = True
-                        break
+                    if camera_matches(c, cam.get('camera_mac'), cam.get('camera_code')):
+                        # If camera is reporting active or reachable RTSP
+                        if cam.get('cloud_push_status') == 'active' or cam.get('recording_status') == 'active' or cam.get('rtsp_reachable'):
+                            is_online = True
+                            break
             if is_online:
                 break
                 
+        # If telemetry confirmed online or mongo had online without contrary offline report
         c['stream_status'] = 'online' if is_online else 'offline'
         if '_id' in c:
             c['_id'] = str(c['_id'])

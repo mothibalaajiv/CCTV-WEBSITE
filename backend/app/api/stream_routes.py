@@ -10,18 +10,13 @@ stream_bp = Blueprint('streams', __name__)
 def get_streams():
     streams = StreamService.get_all_streams()
     
-    import os, urllib.request, json
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timezone
+    from app.utils.telemetry import parse_timestamp, is_telemetry_fresh, fetch_cloud_diagnostics
     
-    cloud_url = os.getenv("CLOUD_SERVER_URL", "http://104.251.214.177:8000/api/diagnostics")
-    if cloud_url.endswith("/api/streams"):
-        cloud_url = cloud_url.replace("/api/streams", "/api/diagnostics")
-    try:
-        req = urllib.request.Request(cloud_url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=1.5) as response:
-            cloud_data = json.loads(response.read().decode()).get('data', [])
-    except Exception:
-        cloud_data = []
+    cloud_data = fetch_cloud_diagnostics()
+    now_utc = datetime.now(timezone.utc)
+    all_ts = [parse_timestamp(d.get('timestamp')) for d in cloud_data]
+    max_cloud_ts = max(all_ts) if all_ts else None
 
     active_streams = []
     for stream in streams:
@@ -32,18 +27,10 @@ def get_streams():
             
         is_online = False
         if matching_diag:
-            last_checked_str = matching_diag.get('timestamp')
-            if last_checked_str:
-                try:
-                    last_checked_dt = datetime.fromisoformat(last_checked_str.replace("Z", "+00:00"))
-                    if last_checked_dt.tzinfo is None:
-                        last_checked_dt = last_checked_dt.replace(tzinfo=timezone.utc)
-                    if datetime.now(timezone.utc) - last_checked_dt < timedelta(minutes=1):
-                        is_online = True
-                except Exception:
-                    pass
+            d_time = parse_timestamp(matching_diag.get('timestamp'))
+            is_online = is_telemetry_fresh(d_time, now_utc, max_cloud_ts, window_seconds=300)
         
-        if is_online:
+        if is_online and stream.get('status') != 'paused':
             active_streams.append(stream)
             
     from app.services.user_service import UserService

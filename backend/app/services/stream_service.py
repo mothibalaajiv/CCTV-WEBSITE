@@ -63,21 +63,41 @@ class StreamService:
         from app.repositories.server_repo import LocalServerRepository
         from app.repositories.stream_repo import StreamRepository
         
+        all_cameras = list(CameraRepository.find_all())
+        all_servers = list(LocalServerRepository.find_all())
+        
+        seen_cameras = set()
         valid_streams = []
-        for s in cloud_data:
-            camera_mac = s.get('camera_mac')
+        
+        # Sort so that streams from the active local server are processed first
+        active_server_macs = [srv.get('mac_address', '').lower() for srv in all_servers if srv.get('is_active')]
+        cloud_data_sorted = sorted(
+            cloud_data, 
+            key=lambda s: 0 if (s.get('local_server_mac') or '').lower() in active_server_macs else 1
+        )
+        
+        for s in cloud_data_sorted:
+            camera_mac = (s.get('camera_mac') or '').lower()
             server_mac = s.get('local_server_mac')
             
             if not camera_mac or not server_mac:
                 continue
                 
-            # 1. Check if camera is registered
-            camera = CameraRepository.find_one({"mac_address": camera_mac})
+            # 1. Check if camera is registered (checking mac_address and mac_aliases case-insensitively)
+            camera = next((
+                c for c in all_cameras 
+                if (c.get('mac_address') or '').lower() == camera_mac 
+                or camera_mac in [(a or '').lower() for a in c.get('mac_aliases', [])]
+            ), None)
+            
             if not camera or not camera.get('is_active'):
                 continue
                 
+            camera_code = camera.get('camera_code')
+            if camera_code in seen_cameras:
+                continue
+                
             # 2. Check if local server MAC is registered or fallback to active registered server
-            all_servers = list(LocalServerRepository.find_all())
             server = next((srv for srv in all_servers if srv.get('mac_address', '').lower() == server_mac.lower() and srv.get('is_active')), None)
             if not server:
                 server = next((srv for srv in all_servers if srv.get('is_active')), None)
@@ -88,7 +108,6 @@ class StreamService:
             if not hls_url:
                 continue
 
-            camera_code = camera.get('camera_code')
             existing_stream = StreamRepository.find_by_camera_code(camera_code)
             
             stream_data = {
@@ -96,8 +115,8 @@ class StreamService:
                 "stream_name": camera.get('location_name', camera_code),
                 "hls_url": hls_url,
                 "local_server_mac": server_mac,
-                "camera_mac": camera_mac,
-                "camera_ip": s.get('camera_ip'),
+                "camera_mac": camera.get('mac_address', camera_mac),
+                "camera_ip": s.get('camera_ip') or camera.get('current_ip'),
                 "last_seen": datetime.now(timezone.utc)
             }
             
@@ -111,5 +130,7 @@ class StreamService:
                 new_stream = StreamRepository.create(stream_data)
                 new_stream['_id'] = str(new_stream['_id'])
                 valid_streams.append(new_stream)
+                
+            seen_cameras.add(camera_code)
             
         return valid_streams
