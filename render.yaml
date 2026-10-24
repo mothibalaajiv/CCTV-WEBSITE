@@ -1,0 +1,71 @@
+services:
+  # -------------------------------------------------------------
+  # 1. CCTV VMS Backend API (Python Flask Service)
+  # -------------------------------------------------------------
+  - type: web
+    name: cctv-vms-backend
+    env: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn run:app
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: "0"
+      - key: MONGO_URI
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: CLOUD_SERVER_URL
+        value: http://104.251.214.177:8000/api/diagnostics
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: ADMIN_PASSWORD
+        sync: false
+
+  # -------------------------------------------------------------
+  # 2. Main Website Frontend (Vite / React SPA)
+  # -------------------------------------------------------------
+  - type: web
+    name: cctv-vms-website
+    env: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: cctv-vms-backend
+          property: host
+
+  # -------------------------------------------------------------
+  # 3. Camera Location Updater (Lightweight Web Client)
+  # -------------------------------------------------------------
+  - type: web
+    name: cctv-camera-location-updater
+    env: static
+    rootDir: camera-location-updater
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: cctv-vms-backend
+          property: host

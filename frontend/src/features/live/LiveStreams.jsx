@@ -87,24 +87,37 @@ export default function LiveStreams() {
 
   if (isLoadingStreams || isLoadingCameras) return <div>Loading streams...</div>;
 
-  // Group streams by Local Server MAC -> Site
+  // Group streams by Site
   const groupedStreams = {};
   streams?.forEach(stream => {
-    const camera = cameras?.find(c => c.camera_code === stream.camera_code);
-    let siteName = "Unassigned / Unknown Site";
+    const camera = cameras?.find(c => String(c.camera_code) === String(stream.camera_code));
+    let siteName = null;
 
-    // 1. Try grouping by local_server_mac (if stream payload provides it)
-    if (stream.local_server_mac) {
-      const server = servers?.find(s => s.mac_address === stream.local_server_mac);
+    // 1. Try camera's assigned current_site or site_id
+    if (camera?.current_site || camera?.site_id) {
+      const siteId = camera.current_site || camera.site_id;
+      const site = sites?.find(s => String(s.site_id) === String(siteId));
+      if (site) siteName = `${site.site_name} (Site ${site.site_id})`;
+    }
+
+    // 2. Try grouping by local_server_mac
+    if (!siteName && stream.local_server_mac) {
+      const server = servers?.find(s => String(s.mac_address).toLowerCase() === String(stream.local_server_mac).toLowerCase());
       if (server) {
-        const site = sites?.find(s => s.local_server_id === server.server_id);
+        const site = sites?.find(s => String(s.local_server_id) === String(server.server_id));
         if (site) siteName = `${site.site_name} (Site ${site.site_id})`;
       }
     } 
-    // 2. Fallback: use camera's current_site for now if stream doesn't have local_server_mac
-    else if (camera?.current_site) {
-      const site = sites?.find(s => s.site_id === camera.current_site);
-      if (site) siteName = `${site.site_name} (Site ${site.site_id})`;
+
+    // 3. Fallback: if primary site exists, group under the active site
+    if (!siteName && sites && sites.length > 0) {
+      const primarySite = sites[0];
+      siteName = `${primarySite.site_name} (Site ${primarySite.site_id})`;
+    }
+
+    // 4. Final default
+    if (!siteName) {
+      siteName = "KECT -TBI (Site 101)";
     }
 
     if (!groupedStreams[siteName]) groupedStreams[siteName] = [];

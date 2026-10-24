@@ -27,7 +27,16 @@ def get_sites():
     tags:
       - Sites
     """
+    from app.services.user_service import UserService
+    from flask_jwt_extended import get_jwt_identity
+    
     sites = SiteService.get_all_sites()
+    
+    user = UserService.get_user(get_jwt_identity())
+    if user.get('role') != 'admin':
+        assigned = user.get('assigned_sites', [])
+        sites = [s for s in sites if str(s.get('site_id')) in map(str, assigned)]
+        
     return jsonify({"status": "success", "data": sites})
 
 @site_bp.route('/<site_id>', methods=['PUT'])

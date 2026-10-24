@@ -1,6 +1,22 @@
 import './style.css';
 
-const API_BASE = `http://${window.location.hostname}:5000/api/public`;
+const getApiBaseUrl = () => {
+  let url = import.meta.env.VITE_API_URL;
+  if (url) {
+    url = url.trim().replace(/\/+$/, "");
+    if (!url.endsWith("/api/public")) {
+      if (url.endsWith("/api")) {
+        url += "/public";
+      } else {
+        url += "/api/public";
+      }
+    }
+    return url;
+  }
+  return `http://${window.location.hostname}:5000/api/public`;
+};
+
+const API_BASE = getApiBaseUrl();
 
 document.getElementById('saveBtn').addEventListener('click', async () => {
   const cameraId = document.getElementById('cameraId').value.trim();

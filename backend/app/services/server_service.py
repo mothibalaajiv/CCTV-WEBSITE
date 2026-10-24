@@ -39,9 +39,20 @@ class LocalServerService:
 
     @classmethod
     def get_all_servers(cls):
+        from app.services.stream_service import StreamService
         servers = LocalServerRepository.find_all()
+        try:
+            active_streams = StreamService.get_all_streams()
+            active_server_macs = {s.get('local_server_mac', '').lower() for s in active_streams if s.get('local_server_mac')}
+            has_active_streams = len(active_streams) > 0
+        except Exception:
+            active_server_macs = set()
+            has_active_streams = False
+
         for s in servers:
             s['_id'] = str(s['_id'])
+            s_mac = s.get('mac_address', '').lower()
+            s['status'] = 'online' if (s_mac in active_server_macs or has_active_streams) else 'offline'
         return servers
 
     @classmethod

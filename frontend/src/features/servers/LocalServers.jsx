@@ -49,9 +49,19 @@ export default function LocalServers() {
                   <TableCell className="font-medium">{server.server_id}</TableCell>
                   <TableCell>{server.mac_address}</TableCell>
                   <TableCell>
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${server.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                      {server.is_active ? "Active" : "Inactive"}
-                    </span>
+                    {!server.is_active ? (
+                      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-100 text-red-800">
+                        Deactivated
+                      </span>
+                    ) : server.status === 'online' ? (
+                      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-green-100 text-green-800">
+                        Online
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-gray-100 text-gray-800">
+                        Offline
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={() => toggleStatusMutation.mutate({ id: server._id, is_active: !server.is_active })}>

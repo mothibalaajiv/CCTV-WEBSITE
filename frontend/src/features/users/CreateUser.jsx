@@ -71,7 +71,33 @@ export default function CreateUser() {
           </select>
         </div>
 
-        <div className="flex justify-end space-x-2">
+        <div>
+          <label className="block text-sm font-medium mb-1">Assign Sites</label>
+          <div className="space-y-2 max-h-40 overflow-y-auto p-3 border rounded border-slate-800 bg-slate-900/50">
+            {sites?.map(site => (
+              <label key={site.site_id} className="flex items-center space-x-3 cursor-pointer p-1 hover:bg-slate-800/50 rounded">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-slate-900"
+                  checked={formData.assigned_sites.includes(site.site_id)}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setFormData(prev => ({
+                      ...prev,
+                      assigned_sites: checked 
+                        ? [...prev.assigned_sites, site.site_id]
+                        : prev.assigned_sites.filter(id => id !== site.site_id)
+                    }));
+                  }}
+                />
+                <span className="text-sm text-slate-300">{site.site_name} <span className="text-slate-500 text-xs">(Site {site.site_id})</span></span>
+              </label>
+            ))}
+            {!sites?.length && <div className="text-sm text-slate-500">No sites available</div>}
+          </div>
+        </div>
+
+        <div className="flex justify-end space-x-2 pt-4">
           <Button variant="outline" type="button" onClick={() => navigate("/users")}>Cancel</Button>
           <Button type="submit" disabled={mutation.isPending}>
             {mutation.isPending ? "Creating..." : "Create User"}

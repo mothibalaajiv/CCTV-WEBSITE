@@ -21,7 +21,7 @@ export default function Login() {
       await login(username, password);
       navigate("/dashboard");
     } catch (err) {
-      setError(err.response?.data?.message || "Invalid credentials. Use admin/admin or security/security");
+      setError(err.response?.data?.message || "Invalid username or password. Please try again.");
     } finally {
       setIsLoading(false);
     }

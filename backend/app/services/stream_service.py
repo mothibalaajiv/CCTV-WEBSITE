@@ -3,6 +3,7 @@ from app.exceptions import APIError
 from datetime import datetime, timezone
 
 import urllib.request
+import urllib.parse
 import json
 import os
 
@@ -75,18 +76,25 @@ class StreamService:
             if not camera or not camera.get('is_active'):
                 continue
                 
-            # 2. Check if local server MAC is registered
-            server = LocalServerRepository.find_one({"mac_address": server_mac})
-            if not server or not server.get('is_active'):
+            # 2. Check if local server MAC is registered or fallback to active registered server
+            all_servers = list(LocalServerRepository.find_all())
+            server = next((srv for srv in all_servers if srv.get('mac_address', '').lower() == server_mac.lower() and srv.get('is_active')), None)
+            if not server:
+                server = next((srv for srv in all_servers if srv.get('is_active')), None)
+            if not server:
                 continue
                 
+            hls_url = s.get('hls_url')
+            if not hls_url:
+                continue
+
             camera_code = camera.get('camera_code')
             existing_stream = StreamRepository.find_by_camera_code(camera_code)
             
             stream_data = {
                 "camera_code": camera_code,
                 "stream_name": camera.get('location_name', camera_code),
-                "hls_url": s.get('hls_url'),
+                "hls_url": hls_url,
                 "local_server_mac": server_mac,
                 "camera_mac": camera_mac,
                 "camera_ip": s.get('camera_ip'),

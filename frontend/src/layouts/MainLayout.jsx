@@ -1,8 +1,41 @@
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Server, Camera, Users, Play, History, Bell, LogOut, Menu } from "lucide-react";
+import { LayoutDashboard, Server, Camera, Users, Play, History, Bell, LogOut, Menu, Activity, Cloud, CloudOff } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { useState, useEffect } from "react";
 import { cn } from "../lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import api from "../lib/api";
+
+const CloudStatusBadge = () => {
+  const { data, isLoading } = useQuery({
+    queryKey: ["cloud-status"],
+    queryFn: () => api.get("/system/cloud-status").then((res) => res.data),
+    refetchInterval: 30000,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700">
+        <Cloud className="h-3.5 w-3.5 animate-pulse" />
+        <span className="hidden sm:inline">Checking Cloud...</span>
+      </div>
+    );
+  }
+
+  const isOnline = data?.online;
+
+  return (
+    <div className={cn(
+      "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors cursor-default",
+      isOnline 
+        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+        : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+    )} title={isOnline ? "Cloud Server Reachable" : "Cloud Server Unreachable"}>
+      {isOnline ? <Cloud className="h-3.5 w-3.5" /> : <CloudOff className="h-3.5 w-3.5" />}
+      <span className="hidden sm:inline">Cloud: {isOnline ? "Online" : "Offline"}</span>
+    </div>
+  );
+};
 
 const NavItem = ({ to, icon: Icon, children, onClick }) => {
   const location = useLocation();
@@ -56,16 +89,23 @@ export default function MainLayout() {
         </div>
         <div className="flex-1 overflow-y-auto py-4">
           <nav className="flex flex-col gap-1 px-4">
-            <NavItem to="/dashboard" icon={LayoutDashboard} onClick={() => setSidebarOpen(false)}>Dashboard</NavItem>
-            <NavItem to="/sites" icon={Server} onClick={() => setSidebarOpen(false)}>Sites</NavItem>
-            <NavItem to="/servers" icon={Server} onClick={() => setSidebarOpen(false)}>Local Servers</NavItem>
-            <NavItem to="/cameras" icon={Camera} onClick={() => setSidebarOpen(false)}>Cameras</NavItem>
             {user?.role === "admin" && (
-              <NavItem to="/users" icon={Users} onClick={() => setSidebarOpen(false)}>Users</NavItem>
+              <>
+                <NavItem to="/dashboard" icon={LayoutDashboard} onClick={() => setSidebarOpen(false)}>Dashboard</NavItem>
+                <NavItem to="/sites" icon={Server} onClick={() => setSidebarOpen(false)}>Sites</NavItem>
+                <NavItem to="/servers" icon={Server} onClick={() => setSidebarOpen(false)}>Local Servers</NavItem>
+                <NavItem to="/cameras" icon={Camera} onClick={() => setSidebarOpen(false)}>Cameras</NavItem>
+                <NavItem to="/troubleshooting" icon={Activity} onClick={() => setSidebarOpen(false)}>Troubleshooting</NavItem>
+                <NavItem to="/users" icon={Users} onClick={() => setSidebarOpen(false)}>Users</NavItem>
+              </>
             )}
             <NavItem to="/live" icon={Play} onClick={() => setSidebarOpen(false)}>Live Streams</NavItem>
-            <NavItem to="/camera-history" icon={History} onClick={() => setSidebarOpen(false)}>Movement History</NavItem>
-            <NavItem to="/notifications" icon={Bell} onClick={() => setSidebarOpen(false)}>Notifications</NavItem>
+            {user?.role === "admin" && (
+              <>
+                <NavItem to="/camera-history" icon={History} onClick={() => setSidebarOpen(false)}>Movement History</NavItem>
+                <NavItem to="/notifications" icon={Bell} onClick={() => setSidebarOpen(false)}>Notifications</NavItem>
+              </>
+            )}
           </nav>
         </div>
       </aside>
@@ -92,6 +132,7 @@ export default function MainLayout() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <CloudStatusBadge />
             <div className="flex flex-col items-end justify-center mr-2">
               <span className="text-sm font-bold">{user?.username}</span>
               <span className="text-[10px] text-slate-400 uppercase tracking-wider">{user?.role}</span>

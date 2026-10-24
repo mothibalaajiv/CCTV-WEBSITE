@@ -20,6 +20,7 @@ import SearchResults from "./features/search/SearchResults";
 
 import LocalServers from "./features/servers/LocalServers";
 import LocalServerRegister from "./features/servers/LocalServerRegister";
+import ServerDiagnostics from "./features/servers/ServerDiagnostics";
 
 function App() {
   return (
@@ -42,6 +43,7 @@ function App() {
               <Route path="/cameras/register" element={<CameraRegister />} />
               <Route path="/servers" element={<LocalServers />} />
               <Route path="/servers/register" element={<LocalServerRegister />} />
+              <Route path="/troubleshooting" element={<ServerDiagnostics />} />
               <Route path="/live" element={<LiveStreams />} />
               <Route path="/camera-history" element={<CameraHistory />} />
               <Route path="/notifications" element={<Notifications />} />
