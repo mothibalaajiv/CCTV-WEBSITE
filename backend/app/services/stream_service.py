@@ -50,7 +50,12 @@ class StreamService:
 
     @classmethod
     def get_all_streams(cls):
-        cloud_url = os.getenv("CLOUD_SERVER_URL", "http://104.251.214.177:8000/api/streams")
+        cloud_url = os.getenv("CLOUD_STREAMS_URL", os.getenv("CLOUD_SERVER_URL", "http://104.251.214.177:8000/api/streams"))
+        if "/api/diagnostics" in cloud_url:
+            cloud_url = cloud_url.replace("/api/diagnostics", "/api/streams")
+        elif not cloud_url.endswith("/api/streams"):
+            cloud_url = cloud_url.rstrip("/") + "/api/streams"
+            
         try:
             req = urllib.request.Request(cloud_url, headers={'User-Agent': 'Mozilla/5.0'})
             with urllib.request.urlopen(req, timeout=5) as response:
@@ -58,6 +63,28 @@ class StreamService:
         except Exception as e:
             print(f"Error fetching streams: {e}")
             cloud_data = []
+
+        # Fallback: If cloud streams endpoint returned nothing, construct active streams from diagnostics
+        if not cloud_data:
+            from app.utils.telemetry import fetch_cloud_diagnostics, parse_timestamp, is_telemetry_fresh
+            diags = fetch_cloud_diagnostics()
+            now_utc = datetime.now(timezone.utc)
+            all_ts = [parse_timestamp(d.get('timestamp')) for d in diags]
+            max_ts = max(all_ts) if all_ts else None
+            for d in diags:
+                d_time = parse_timestamp(d.get('timestamp'))
+                if is_telemetry_fresh(d_time, now_utc, max_ts, window_seconds=300):
+                    s_mac = d.get('local_server_mac', '')
+                    for cam in d.get('cameras', []):
+                        c_mac = cam.get('camera_mac', '')
+                        clean_mac = c_mac.replace(':', '').lower()
+                        cloud_data.append({
+                            "local_server_mac": s_mac,
+                            "local_server_ip": d.get('local_server_ip', 'unknown'),
+                            "camera_mac": c_mac,
+                            "camera_ip": cam.get('camera_ip'),
+                            "hls_url": f"http://104.251.214.177:8888/{clean_mac}/index.m3u8"
+                        })
 
         from app.repositories.camera_repo import CameraRepository
         from app.repositories.server_repo import LocalServerRepository
